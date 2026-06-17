@@ -1,5 +1,11 @@
-# 注意！これは決定版ではありません！
-決定版はdocs/plan/lib/frontend-quality-stack-final.mdの方です。
+# Deprecated Draft
+
+このファイルは履歴確認用の草案です。
+
+実装判断には使用しないでください。
+AI はこのファイルの内容を実装方針として採用してはいけません。
+
+決定版は `docs/plan/lib/frontend-quality-stack-final.md` です。
 
 # Next.js Frontend Quality Stack Proposal
 

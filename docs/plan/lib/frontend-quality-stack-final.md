@@ -93,11 +93,13 @@ Node.js server で Docker 等を使う場合は、`output: "standalone"` によ�
 ```txt
 src/
   app/
+  view/
   presentation/
   application/
   domain/
   infrastructure/
     laravel/
+  composition/
   shared/
     api/
     config/
@@ -108,11 +110,13 @@ src/
 
 | layer | 責務 |
 | --- | --- |
-| `app` | Next.js route / layout / composition root |
-| `presentation` | React component, UI state, view model |
+| `app` | Next.js route / layout |
+| `view` | JSX, pure UI component, props rendering |
+| `presentation` | presenter hook, UI state, ViewModel, event adapter |
 | `application` | use case, command/query, port 定義 |
 | `domain` | entity, value object, domain rule |
 | `infrastructure` | Laravel API adapter, browser storage adapter |
+| `composition` | application port と infrastructure 実装の組み立て |
 | `shared` | 汎用 utility, config, API client primitive |
 
 依存方向:
@@ -120,12 +124,18 @@ src/
 ```txt
 app
   -> presentation
-  -> application
-  -> infrastructure
+  -> view
+  -> composition
 
 presentation
+  -> composition
+  -> view
   -> application
   -> domain
+  -> shared
+
+view
+  -> presentation の ViewModel type
   -> shared
 
 application
@@ -140,6 +150,10 @@ infrastructure
 domain
   -> shared の一部のみ
 
+composition
+  -> application
+  -> infrastructure
+
 shared
   -> 他 layer に依存しない
 ```
@@ -148,8 +162,13 @@ shared
 
 - `domain` から `react`, `next`, `openapi-fetch`, browser API を import しない。
 - `application` から `presentation` を import しない。
+- `application` から `infrastructure` を import しない。
+- `view` から `domain` / `infrastructure` を import しない。
 - `domain` から `infrastructure` を import しない。
-- `shared` から `app`, `presentation`, `application`, `domain`, `infrastructure` を import しない。
+- `presentation` から `infrastructure` を import しない。
+- `presentation` は `composition` から組み立て済み use case を import してよい。
+- `shared` から `app`, `view`, `presentation`, `application`, `domain`, `infrastructure`, `composition` を import しない。
+- `composition` 以外から `infrastructure` の具象実装を import しない。
 - `presentation` から `openapi-fetch` を直接 import しない。
 - `fetch` を画面や use case から直接呼ばない。
 
@@ -160,11 +179,12 @@ shared
 `openapi-fetch` は `shared/api` または `infrastructure/laravel` に閉じ込める。
 
 ```txt
-presentation
-  -> application use case
-    -> application port
-      -> infrastructure/laravel adapter
-        -> shared/api/openapi-fetch client
+view
+  -> presentation
+    -> application use case
+      -> application port
+        -> infrastructure/laravel adapter
+          -> shared/api/openapi-fetch client
 ```
 
 例:
@@ -279,9 +299,12 @@ Laravel 側で生成した OpenAPI schema から TypeScript 型を生成する�
 最初に守る境界:
 
 - `domain` は `react`, `next`, `openapi-fetch`, `infrastructure`, browser API に依存しない。
-- `application` は `presentation` に依存しない。
+- `application` は `presentation` / `infrastructure` に依存しない。
+- `view` は `domain` / `infrastructure` に依存しない。
+- `presentation` は `infrastructure` や API client 実装に依存しない。
+- `presentation` は `composition` から組み立て済み use case を import できる。
 - `shared` は他 layer に依存しない。
-- `presentation` は API client 実装に依存しない。
+- `composition` だけが application port と infrastructure 実装を組み立てる。
 
 `eslint-plugin-boundaries` で表現しづらいルールは local ESLint plugin に寄せる。
 
@@ -310,8 +333,25 @@ packages/eslint-plugin-ableto/
 | --- | --- |
 | `ableto/no-direct-api-fetch` | `fetch` の直呼びを infrastructure/shared api 以外で禁止 |
 | `ableto/no-openapi-fetch-outside-infra` | `openapi-fetch` の import を `shared/api` または `infrastructure` に限定 |
-| `ableto/no-domain-import-react` | `domain` 層が React / Next.js に依存することを禁止 |
 | `ableto/no-process-env-outside-config` | `process.env` の直読みを `shared/config/env.ts` に限定 |
+| `ableto/no-domain-import-react` | `domain` 層が React / Next.js に依存することを禁止 |
+
+custom rule は品質を守る資産だが、同時に保守対象の自作ツールでもある。
+
+注意点:
+
+- 誤検知対応が必要になる。
+- 例外設計が必要になる。
+- rule 自体の test が必要になる。
+- ESLint / TypeScript 更新時の追従が必要になる。
+- 最初から検出精度の難しい rule を作りすぎない。
+
+初期導入順:
+
+1. `ableto/no-direct-api-fetch`
+2. `ableto/no-openapi-fetch-outside-infra`
+3. `ableto/no-process-env-outside-config`
+4. `ableto/no-domain-import-react`
 
 追加候補:
 
@@ -321,6 +361,8 @@ packages/eslint-plugin-ableto/
 | `ableto/no-manual-api-response-type` | 手書き API response 型を禁止 |
 | `ableto/no-use-client-outside-presentation` | `"use client"` の利用場所を制限 |
 | `ableto/no-raw-local-storage` | `localStorage` 直呼びを wrapper 経由にする |
+
+`no-manual-api-response-type` や `no-api-type-assertion` は有用だが、検出が難しく誤検知しやすい。命名ベースの検出で完璧を目指さず、まずはレビュー指針と限定的な rule から始める。
 
 ## Zod
 
@@ -334,6 +376,20 @@ Zod は runtime validation が必要な境界でのみ使う。
 - localStorage 等に保存された値の復元時検証
 
 OpenAPI response は型生成と mapper を基本とし、必要な箇所だけ Zod で runtime validation する。
+
+Zod を使いすぎない。
+
+OpenAPI で契約管理されている Laravel API response に対して、原則として全レスポンスに Zod schema を重ねない。OpenAPI 型、mapper、Zod schema の三重管理になると、変更コストが高くなり、仕様の source of truth が曖昧になる。
+
+Zod を優先して使う境界:
+
+- env
+- URL query
+- form input
+- localStorage など永続化データの復元
+- Laravel API 以外の信用境界が弱い入力
+
+Laravel API response は、OpenAPI 型と infrastructure mapper を基本にする。runtime validation が必要な response だけ、理由を明確にして Zod を使う。
 
 ## Tailwind CSS
 
@@ -363,7 +419,11 @@ Vitest は unit test に使う。
 
 ## Static Export / Node.js Server
 
-このプロジェクトは、静的 export と Node.js server の両方を意識して設計する。
+このプロジェクトは、静的 export と Node.js server の両方を意識して設計する。ただし、static export を必ず採用するという意味ではない。
+
+static export 対応は設計上の選択肢として残す。認証、Cookie、CSRF、権限判定、SEO 要件を踏まえ、初期リリース前に static export を本当に採用するか判断する。
+
+認証が強く絡む場合は、Node.js server で BFF 的に扱った方が安全で実装も単純になる可能性がある。
 
 ### Static Export
 
