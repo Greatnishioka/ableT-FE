@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { login } from "@/src/di/auth/auth-use-cases";
+import { authUseCases } from "@/src/di/auth/auth-use-cases";
 import { presentLoginError } from "@/src/presentation/login/error/login-error-presenter";
 import { toLoginCommand } from "@/src/presentation/login/mapper/login-command-mapper";
 import type { LoginViewModel } from "@/src/presentation/login/view-model/login-view-model";
@@ -49,7 +49,7 @@ export function useLoginPresenter(): LoginViewProps {
     }));
 
     try {
-      await login(toLoginCommand(viewModel));
+      await authUseCases.login(toLoginCommand(viewModel));
       router.push("/");
     } catch (error) {
       setState((current) => ({

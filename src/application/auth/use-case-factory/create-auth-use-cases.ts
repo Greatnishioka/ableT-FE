@@ -3,8 +3,14 @@ import type {
   LoginCommand,
 } from "@/src/application/auth/ports/auth-repository";
 
-export function createLoginUseCase(authRepository: AuthRepository) {
-  return async function login(command: LoginCommand): Promise<void> {
-    await authRepository.login(command);
+type AuthUseCases = {
+  [K in keyof AuthRepository]: AuthRepository[K];
+};
+
+export function createAuthUseCases(authRepository: AuthRepository): AuthUseCases {
+  return {
+    login: async (command: LoginCommand) => {
+      await authRepository.login(command);
+    }
   };
 }
