@@ -1,29 +1,29 @@
 import type { AuthRepository } from "@/src/application/auth/ports/auth-repository";
 import { AuthenticationFailedError } from "@/src/application/auth/error/auth-errors";
 import { mapAuthError } from "@/src/infrastructure/api/auth/mappers/auth-error-mapper";
-
-const DEMO_EMAIL = "demo@example.com";
-const DEMO_PASSWORD = "password123";
+import { Fetcher } from "@/src/shared/api/client";
 
 export const authApiAdapter: AuthRepository = {
   async login(command) {
     try {
-      await wait(300);
+      const { error, response } = await Fetcher.POST("/api/login", {
+        body: {
+          email: command.email.value,
+          password: command.password.value,
+        },
+      });
 
-      if (
-        command.email.value !== DEMO_EMAIL ||
-        command.password.value !== DEMO_PASSWORD
-      ) {
+      if (!error) {
+        return;
+      }
+
+      if (response.status === 422) {
         throw new AuthenticationFailedError();
       }
+
+      throw new Error(`Login request failed with status ${response.status}.`);
     } catch (error) {
       throw mapAuthError(error);
     }
   },
 };
-
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
