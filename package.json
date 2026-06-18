@@ -10,7 +10,9 @@
     "lint": "eslint",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
-    "ci": "npm run typecheck && npm run lint && npm run test && npm run build"
+    "api:generate": "openapi-typescript ../ableTo/storage/api-docs/api-docs.json -o src/shared/api/schema.d.ts",
+    "api:check": "npm run api:generate && git diff --exit-code -- src/shared/api/schema.d.ts",
+    "ci": "npm run api:check && npm run typecheck && npm run lint && npm run test && npm run build"
   },
   "dependencies": {
     "next": "16.2.6",
