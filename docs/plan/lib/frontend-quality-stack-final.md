@@ -6,7 +6,7 @@
 
 - 最初から大量のライブラリを入れない。
 - ランタイムで動作する外部ライブラリは腐敗防止層に閉じ込める。
-- Laravel API との通信は infrastructure 層の責務にする。
+- Backend API との通信は infrastructure 層の責務にする。
 - フロントエンドにも DDD 的な依存方向を持たせる。
 - アーキテクチャ保護とプロジェクト固有のカスタムルールは最初から導入する。
 - 静的 export と Node.js server の両方を意識して設計する。
@@ -91,15 +91,16 @@ Node.js server で Docker 等を使う場合は、`output: "standalone"` によ�
 推奨構成:
 
 ```txt
+app/
+
 src/
-  app/
   view/
   presentation/
   application/
   domain/
   infrastructure/
-    laravel/
-  composition/
+    api/
+  di/
   shared/
     api/
     config/
@@ -113,10 +114,10 @@ src/
 | `app` | Next.js route / layout |
 | `view` | JSX, pure UI component, props rendering |
 | `presentation` | presenter hook, UI state, ViewModel, event adapter |
-| `application` | use case, command/query, port 定義 |
+| `application` | use case factory, command/query, port 定義 |
 | `domain` | entity, value object, domain rule |
-| `infrastructure` | Laravel API adapter, browser storage adapter |
-| `composition` | application port と infrastructure 実装の組み立て |
+| `infrastructure` | Backend API adapter, browser storage adapter |
+| `di` | application port と infrastructure 実装の組み立て |
 | `shared` | 汎用 utility, config, API client primitive |
 
 依存方向:
@@ -125,10 +126,10 @@ src/
 app
   -> presentation
   -> view
-  -> composition
+  -> di
 
 presentation
-  -> composition
+  -> di
   -> view
   -> application
   -> domain
@@ -150,7 +151,7 @@ infrastructure
 domain
   -> shared の一部のみ
 
-composition
+di
   -> application
   -> infrastructure
 
@@ -166,9 +167,9 @@ shared
 - `view` から `domain` / `infrastructure` を import しない。
 - `domain` から `infrastructure` を import しない。
 - `presentation` から `infrastructure` を import しない。
-- `presentation` は `composition` から組み立て済み use case を import してよい。
-- `shared` から `app`, `view`, `presentation`, `application`, `domain`, `infrastructure`, `composition` を import しない。
-- `composition` 以外から `infrastructure` の具象実装を import しない。
+- `presentation` は `di` から組み立て済み use case を import してよい。
+- `shared` から `app`, `view`, `presentation`, `application`, `domain`, `infrastructure`, `di` を import しない。
+- `di` 以外から `infrastructure` の具象実装を import しない。
 - `presentation` から `openapi-fetch` を直接 import しない。
 - `fetch` を画面や use case から直接呼ばない。
 
@@ -176,21 +177,21 @@ shared
 
 ランタイムで動作する外部ライブラリは、直接アプリ全体に広げない。
 
-`openapi-fetch` は `shared/api` または `infrastructure/laravel` に閉じ込める。
+`openapi-fetch` は `shared/api` または `infrastructure/api` に閉じ込める。
 
 ```txt
 view
   -> presentation
     -> application use case
       -> application port
-        -> infrastructure/laravel adapter
+        -> infrastructure/api adapter
           -> shared/api/openapi-fetch client
 ```
 
 例:
 
 ```ts
-// src/application/ports/user-repository.ts
+// src/application/user/ports/user-repository.ts
 import type { User } from "@/src/domain/user/user";
 
 export interface UserRepository {
@@ -198,13 +199,26 @@ export interface UserRepository {
 }
 ```
 
+use case factory は `src/application/{context}/use-case-factory/` に置く。
+
+```txt
+src/application/auth/
+  ports/
+    auth-repository.ts
+  use-case-factory/
+    create-login-use-case.ts
+    create-auth-use-cases.ts
+  error/
+    auth-errors.ts
+```
+
 ```ts
-// src/infrastructure/laravel/user-repository.ts
-import type { UserRepository } from "@/src/application/ports/user-repository";
+// src/infrastructure/api/user/user-api-adapter.ts
+import type { UserRepository } from "@/src/application/user/ports/user-repository";
 import { apiClient } from "@/src/shared/api/client";
 import { toUser } from "./mappers/user-mapper";
 
-export const laravelUserRepository: UserRepository = {
+export const userApiAdapter: UserRepository = {
   async findMe() {
     const { data, error } = await apiClient.GET("/api/me");
 
@@ -217,11 +231,11 @@ export const laravelUserRepository: UserRepository = {
 };
 ```
 
-この形にすると、`openapi-fetch` を別の API client に交換する場合も、影響範囲を `shared/api` と `infrastructure/laravel` に閉じられる。
+この形にすると、`openapi-fetch` を別の API client に交換する場合も、影響範囲を `shared/api` と `infrastructure/api` に閉じられる。
 
 ## OpenAPI
 
-Laravel 側で生成した OpenAPI schema から TypeScript 型を生成する。
+Backendで生成した OpenAPI schema から TypeScript 型を生成する。
 
 採用:
 
@@ -302,9 +316,9 @@ Laravel 側で生成した OpenAPI schema から TypeScript 型を生成する�
 - `application` は `presentation` / `infrastructure` に依存しない。
 - `view` は `domain` / `infrastructure` に依存しない。
 - `presentation` は `infrastructure` や API client 実装に依存しない。
-- `presentation` は `composition` から組み立て済み use case を import できる。
+- `presentation` は `di` から組み立て済み use case を import できる。
 - `shared` は他 layer に依存しない。
-- `composition` だけが application port と infrastructure 実装を組み立てる。
+- `di` だけが application port と infrastructure 実装を組み立てる。
 
 `eslint-plugin-boundaries` で表現しづらいルールは local ESLint plugin に寄せる。
 
@@ -372,14 +386,14 @@ Zod は runtime validation が必要な境界でのみ使う。
 
 - `process.env` の検証
 - URL query / form input の検証
-- Laravel API 以外から来る外部入力の検証
+- Backend API 以外から来る外部入力の検証
 - localStorage 等に保存された値の復元時検証
 
 OpenAPI response は型生成と mapper を基本とし、必要な箇所だけ Zod で runtime validation する。
 
 Zod を使いすぎない。
 
-OpenAPI で契約管理されている Laravel API response に対して、原則として全レスポンスに Zod schema を重ねない。OpenAPI 型、mapper、Zod schema の三重管理になると、変更コストが高くなり、仕様の source of truth が曖昧になる。
+OpenAPI で契約管理されている Backend API response に対して、原則として全レスポンスに Zod schema を重ねない。OpenAPI 型、mapper、Zod schema の三重管理になると、変更コストが高くなり、仕様の source of truth が曖昧になる。
 
 Zod を優先して使う境界:
 
@@ -387,9 +401,9 @@ Zod を優先して使う境界:
 - URL query
 - form input
 - localStorage など永続化データの復元
-- Laravel API 以外の信用境界が弱い入力
+- Backend API 以外の信用境界が弱い入力
 
-Laravel API response は、OpenAPI 型と infrastructure mapper を基本にする。runtime validation が必要な response だけ、理由を明確にして Zod を使う。
+Backend API response は、OpenAPI 型と infrastructure mapper を基本にする。runtime validation が必要な response だけ、理由を明確にして Zod を使う。
 
 ## Tailwind CSS
 
@@ -433,8 +447,8 @@ static export 対応は設計上の選択肢として残す。認証、Cookie、
 
 - `out/` に HTML/CSS/JS を生成する。
 - Nginx、S3、Apache など静的配信環境で動かせる。
-- Laravel API へ browser から直接通信する。
-- CORS、Cookie、CSRF、token 管理は Laravel 側の設計に依存する。
+- Backend API へ browser から直接通信する。
+- CORS、Cookie、CSRF、token 管理は Backendの設計に依存する。
 
 静的 export で避けるもの:
 
@@ -484,7 +498,7 @@ static export 対応は設計上の選択肢として残す。認証、Cookie、
 
 1. `tsconfig.json` を strict に強化する。
 2. `openapi-typescript` と `openapi-fetch` を入れる。
-3. `shared/api` と `infrastructure/laravel` に API client を閉じ込める。
+3. `shared/api` と `infrastructure/api` に API client を閉じ込める。
 4. `typescript-eslint` の type-aware lint を入れる。
 5. `eslint-plugin-boundaries` で layer import を制限する。
 6. local ESLint plugin を作る。

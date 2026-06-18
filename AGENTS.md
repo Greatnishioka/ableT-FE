@@ -21,6 +21,6 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - `fetch` を `view` / `presentation` / `application` から直接呼ばない。
 - `view` は domain model を直接受け取らず、ViewModel を props として受け取る。
 - `application` は `infrastructure` の具象実装を import しない。
-- composition root は `src/composition` または `src/app/_composition` に置く。
+- DI provider は `src/di` に置く。
 - generated OpenAPI files を手で編集しない。
 - 新しい dependency は明示的な依頼または承認なしに追加しない。

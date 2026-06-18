@@ -22,7 +22,7 @@ Able-T の Next.js フロントエンドです。
 - `fetch` の直呼びは禁止する。
 - View は domain model を直接受け取らない。
 - View は ViewModel を props として受け取る。
-- Laravel API response は View に直接流さない。
+- Backend API response は View に直接流さない。
 - フロントエンド domain はバックエンド domain の複製にしない。
 - 機械的に判断できるアーキテクチャ違反は ESLint / custom rule で検出する。
 

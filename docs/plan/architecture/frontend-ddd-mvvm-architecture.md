@@ -1,12 +1,12 @@
 # Frontend DDD / MVVM Architecture Proposal
 
-このドキュメントは、Able-T フロントエンドに DDD 的な依存方向、MVVM 的な ViewModel、Laravel API への腐敗防止層を導入するための設計案です。
+このドキュメントは、Able-T フロントエンドに DDD 的な依存方向、MVVM 的な ViewModel、Backend API への腐敗防止層を導入するための設計案です。
 
 目的:
 
 - View を domain model から切り離す。
 - ランタイムライブラリを腐敗防止層に閉じ込める。
-- Laravel API との通信を infrastructure に隔離する。
+- Backend API との通信を infrastructure に隔離する。
 - static export と Node.js server の両方で成立する構成にする。
 - ESLint custom rule でアーキテクチャ違反を検出できる形にする。
 
@@ -15,15 +15,18 @@
 推奨ディレクトリ:
 
 ```txt
+app/
+  login/
+    page.tsx
+
 src/
-  app/
   view/
   presentation/
   application/
   domain/
   infrastructure/
-    laravel/
-  composition/
+    api/
+  di/
   shared/
     api/
     config/
@@ -37,7 +40,7 @@ view
   -> presentation
     -> application
       -> infrastructure
-        -> Laravel API
+        -> Backend API
 ```
 
 コード上の依存方向:
@@ -46,10 +49,10 @@ view
 app
   -> presentation
   -> view
-  -> composition
+  -> di
 
 presentation
-  -> composition
+  -> di
   -> view
   -> application
   -> domain
@@ -68,7 +71,7 @@ infrastructure
   -> domain
   -> shared/api
 
-composition
+di
   -> application
   -> infrastructure
 
@@ -99,7 +102,7 @@ shared
 domain rule が存在しない単純な read-only 画面では、以下のように始めてよい。
 
 ```txt
-Laravel API response
+Backend API response
   -> infrastructure mapper
     -> ViewModel
       -> view
@@ -135,8 +138,8 @@ domain / application を明確に分離する条件:
 | `presentation` | presenter hook, ViewModel 生成, UI state, event adapter |
 | `application` | use case, command/query, port/interface |
 | `domain` | entity, value object, domain service, domain rule |
-| `infrastructure` | Laravel API adapter, storage adapter, external runtime library adapter |
-| `composition` | application port と infrastructure 実装の組み立て |
+| `infrastructure` | API adapter, storage adapter, external runtime library adapter |
+| `di` | application port と infrastructure 実装の組み立て |
 | `shared` | config, generic utility, generated API schema, primitive wrapper |
 
 ## Boundary Clarification
@@ -166,7 +169,7 @@ frontend domain は、UI 上で扱う業務概念を安全に表現し、画面�
 
 ### Zod
 
-Zod は信用境界で runtime validation が必要な場合に使う。OpenAPI で管理されている Laravel API response は、生成型と infrastructure mapper を基本とする。
+Zod は信用境界で runtime validation が必要な場合に使う。OpenAPI で管理されている Backend API response は、生成型と infrastructure mapper を基本とする。
 
 Zod を domain model、mapper、TypeScript type の代替として乱用しない。特に OpenAPI schema、generated TypeScript type、Zod schema の三重管理は避ける。
 
@@ -198,7 +201,7 @@ View が持たないもの:
 
 ```tsx
 // src/view/user/user-profile-view.tsx
-import type { UserProfileViewModel } from "@/src/presentation/user/user-profile-view-model";
+import type { UserProfileViewModel } from "@/src/presentation/user-profile/view-model/user-profile-view-model";
 
 type Props = {
   user: UserProfileViewModel | null;
@@ -257,7 +260,7 @@ export function UserProfileView({
 - application error を画面表示用 message に変換する。
 
 ```ts
-// src/presentation/user/user-profile-view-model.ts
+// src/presentation/user-profile/view-model/user-profile-view-model.ts
 export type UserProfileViewModel = {
   id: string;
   displayName: string;
@@ -267,11 +270,11 @@ export type UserProfileViewModel = {
 ```
 
 ```ts
-// src/presentation/user/user-profile-presenter.ts
+// src/presentation/user-profile/user-profile-presenter.ts
 import { useCallback, useEffect, useState } from "react";
 import type { User } from "@/src/domain/user/user";
-import { getCurrentUser } from "@/src/composition/user-composition";
-import type { UserProfileViewModel } from "./user-profile-view-model";
+import { getCurrentUser } from "@/src/di/user/user-use-cases";
+import type { UserProfileViewModel } from "./view-model/user-profile-view-model";
 
 type State = {
   user: UserProfileViewModel | null;
@@ -351,10 +354,13 @@ loading 制御
 ```txt
 src/presentation/user-profile/
   user-profile-presenter.ts
-  user-profile-view-model.ts
-  user-profile-view-model-mapper.ts
-  user-profile-error-presenter.ts
-  user-profile-command-mapper.ts
+  view-model/
+    user-profile-view-model.ts
+  mapper/
+    user-profile-view-model-mapper.ts
+    user-profile-command-mapper.ts
+  error/
+    user-profile-error-presenter.ts
 ```
 
 分割基準:
@@ -442,7 +448,7 @@ export type UpdateUserProfileCommand = {
 
 ## Application
 
-`application` は use case と port/interface を持つ。
+`application` は use case factory と port/interface を持つ。
 
 application が知ってよいもの:
 
@@ -458,13 +464,13 @@ application が知らないもの:
 - Next.js
 - `fetch`
 - `openapi-fetch`
-- Laravel API response shape
+- Backend API response shape
 - browser API
 
 例:
 
 ```ts
-// src/application/ports/user-repository.ts
+// src/application/user/ports/user-repository.ts
 import type { User } from "@/src/domain/user/user";
 
 export interface UserRepository {
@@ -473,15 +479,30 @@ export interface UserRepository {
 ```
 
 ```ts
-// src/application/user/get-current-user.ts
-import type { UserRepository } from "@/src/application/ports/user-repository";
+// src/application/user/use-case-factory/create-get-current-user-use-case.ts
+import type { UserRepository } from "@/src/application/user/ports/user-repository";
 
-export function createGetCurrentUser(userRepository: UserRepository) {
+export function createGetCurrentUserUseCase(userRepository: UserRepository) {
   return async function getCurrentUser() {
     return userRepository.findMe();
   };
 }
 ```
+
+配置:
+
+```txt
+src/application/{context}/
+  ports/
+    {resource}-repository.ts
+  use-case-factory/
+    create-{action}-{resource}-use-case.ts
+    create-{context}-use-cases.ts
+  error/
+    {context}-errors.ts
+```
+
+`create-{action}-{resource}-use-case.ts` は単体 use case の factory を置く。`create-{context}-use-cases.ts` は複数 use case をまとめて生成する場合にだけ使う。
 
 ## Domain
 
@@ -499,12 +520,12 @@ export function createGetCurrentUser(userRepository: UserRepository) {
 
 フロントエンド domain に持ち込まないもの:
 
-- Laravel 側でしか保証できない最終的な業務制約。
+- Backendでしか保証できない最終的な業務制約。
 - DB 整合性に依存する判断。
 - 権限の最終判定。
 - 決済、契約、申請承認などの authoritative な状態変更ルール。
 
-フロントエンド domain は、UI を安全に動かすための model です。バックエンドと同じ business rule を二重実装する場所ではない。最終的な正しさは Laravel API 側で保証し、フロントエンドでは表示、入力、操作の不正状態を早めに防ぐ。
+フロントエンド domain は、UI を安全に動かすための model です。バックエンドと同じ business rule を二重実装する場所ではない。最終的な正しさは Backend API 側で保証し、フロントエンドでは表示、入力、操作の不正状態を早めに防ぐ。
 
 domain が持ってよいもの:
 
@@ -551,13 +572,13 @@ export class UserName {
 
 `infrastructure` は external world と application port を接続する。
 
-このプロジェクトでは、主な infrastructure は Laravel API adapter です。
+このプロジェクトでは、主な infrastructure は Backend API adapter です。
 
 infrastructure が持ってよいもの:
 
 - `openapi-fetch`
 - generated OpenAPI type
-- Laravel API response mapping
+- Backend API response mapping
 - browser storage adapter
 - external runtime library adapter
 
@@ -571,12 +592,12 @@ infrastructure が持たないもの:
 例:
 
 ```ts
-// src/infrastructure/laravel/user-repository.ts
-import type { UserRepository } from "@/src/application/ports/user-repository";
+// src/infrastructure/api/user/user-api-adapter.ts
+import type { UserRepository } from "@/src/application/user/ports/user-repository";
 import { apiClient } from "@/src/shared/api/client";
 import { toUser } from "./mappers/user-mapper";
 
-export const laravelUserRepository: UserRepository = {
+export const userApiAdapter: UserRepository = {
   async findMe() {
     const { data, error } = await apiClient.GET("/api/me");
 
@@ -590,7 +611,7 @@ export const laravelUserRepository: UserRepository = {
 ```
 
 ```ts
-// src/infrastructure/laravel/mappers/user-mapper.ts
+// src/infrastructure/api/user/mappers/user-mapper.ts
 import { UserName } from "@/src/domain/user/user-name";
 import type { User } from "@/src/domain/user/user";
 import type { components } from "@/src/shared/api/schema";
@@ -612,40 +633,39 @@ export function toUser(response: UserResponse): User {
 }
 ```
 
-## Composition Root
+## DI Providers
 
-具象 implementation の組み立ては composition root に寄せる。
+具象 implementation の組み立ては DI provider に寄せる。
 
 候補:
 
-- `src/composition/**`
-- `src/app/_composition/**`
+- `src/di/**`
 
 例:
 
 ```ts
-// src/composition/user-composition.ts
-import { createGetCurrentUser } from "@/src/application/user/get-current-user";
-import { laravelUserRepository } from "@/src/infrastructure/laravel/user-repository";
+// src/di/user/user-use-cases.ts
+import { createGetCurrentUserUseCase } from "@/src/application/user/use-case-factory/create-get-current-user-use-case";
+import { userApiAdapter } from "@/src/infrastructure/api/user/user-api-adapter";
 
-export const getCurrentUser = createGetCurrentUser(laravelUserRepository);
+export const getCurrentUser = createGetCurrentUserUseCase(userApiAdapter);
 ```
 
-`presentation` は `infrastructure` を直接 import しない。composition root だけが infrastructure の具象実装を知る。
+`presentation` は `infrastructure` を直接 import しない。DI provider だけが infrastructure の具象実装を知る。
 
-AI に実装させる場合は例外を作らない。小規模な feature でも composition は `src/composition` または `src/app/_composition` に置く。
+AI に実装させる場合は例外を作らない。小規模な feature でも di は `src/di` に置く。
 
-`shared` は他 layer に依存しない純粋な shared layer として保つ。composition root は application と infrastructure に依存するため、`shared` 配下には置かない。
+`shared` は他 layer に依存しない純粋な shared layer として保つ。DI provider は application と infrastructure に依存するため、`shared` 配下には置かない。
 
-`presentation` は composition から組み立て済み use case を import してよい。ただし、composition を application use case の代替にしない。
+`presentation` は di から組み立て済み use case を import してよい。ただし、di を application use case の代替にしない。
 
-composition に置いてよいもの:
+di に置いてよいもの:
 
 - application use case factory と infrastructure implementation の組み立て
 - runtime context に応じた adapter 選択
-- static export / Node.js server など実行環境ごとの composition
+- static export / Node.js server など実行環境ごとの di
 
-composition に置かないもの:
+di に置かないもの:
 
 - business logic
 - ViewModel mapping
@@ -661,14 +681,14 @@ composition に置かないもの:
 
 - `openapi-fetch`
 - generated OpenAPI response type
-- Laravel API response shape
+- Backend API response shape
 - browser storage API
 - runtime validation library の具体 API
 
 境界:
 
 ```txt
-Laravel API response
+Backend API response
   -> infrastructure mapper
     -> domain entity / value object
       -> presentation mapper
@@ -676,7 +696,7 @@ Laravel API response
           -> view props
 ```
 
-この流れにすると、Laravel API の response shape や API client library を交換しても、影響範囲を infrastructure に閉じられる。
+この流れにすると、Backend API の response shape や API client library を交換しても、影響範囲を infrastructure に閉じられる。
 
 ## Static Export / Node.js Server
 
@@ -684,7 +704,7 @@ Laravel API response
 
 ### Static Export
 
-static export では browser から Laravel API に直接通信する。
+static export では browser から Backend API に直接通信する。
 
 避けるもの:
 
@@ -696,7 +716,7 @@ static export では browser から Laravel API に直接通信する。
 - ISR
 - default loader の `next/image`
 
-認証、CORS、CSRF、Cookie、token 管理は Laravel API 側の設計に依存する。
+認証、CORS、CSRF、Cookie、token 管理は Backend API 側の設計に依存する。
 
 ### Node.js Server
 
@@ -723,7 +743,7 @@ view
   cannot import openapi-fetch
 
 presentation
-  can import composition
+  can import di
   can import view
   can import application
   can import domain for mapping
@@ -751,7 +771,7 @@ infrastructure
 shared
   cannot import app / view / presentation / application / domain / infrastructure
 
-composition
+di
   can import application
   can import infrastructure
   cannot import view
@@ -778,7 +798,7 @@ custom rule 候補:
 - `application` から `presentation` / `infrastructure` への import 禁止
 - `domain` から `react` / `next` / `infrastructure` への import 禁止
 - `shared` から他 layer への import 禁止
-- `composition` 以外から `infrastructure` 具象実装への import 禁止
+- `di` 以外から `infrastructure` 具象実装への import 禁止
 
 `eslint-plugin-boundaries` で表現しづらいものは、local ESLint plugin の custom rule として追加する。
 
@@ -810,4 +830,4 @@ custom rule に寄せるもの:
 - 小さい画面では presenter と ViewModel を薄くする。
 - domain rule がない単純なデータは無理に Entity 化しない。
 - application use case が薄い pass-through でも、置き場は application に揃える。
-- composition root は `src/composition` または `src/app/_composition` に置く。
+- DI provider は `src/di` に置く。

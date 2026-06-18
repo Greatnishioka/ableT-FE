@@ -26,7 +26,7 @@ Domain test
   entity / value object / domain rule の不変条件を検証する
 
 Mapper test
-  Laravel API response -> domain model の翻訳を検証する
+  Backend API response -> domain model の翻訳を検証する
 
 Presenter test
   domain model -> ViewModel の翻訳と UI state 遷移を検証する
@@ -117,13 +117,13 @@ UserName
 
 対象:
 
-- use case
+- use case factory
 - command/query
 - port 経由の処理
 
 検証すること:
 
-- use case が期待する port を呼ぶ。
+- factory が生成した use case が期待する port を呼ぶ。
 - domain rule に従って結果を返す。
 - 不正な command を拒否する。
 - infrastructure の具象実装に依存しない。
@@ -134,19 +134,19 @@ application test では repository を fake / stub にする。
 
 対象:
 
-- Laravel API adapter
+- Backend API adapter
 - API response mapper
 - storage adapter
 
 検証すること:
 
-- Laravel API response を domain model に変換できる。
+- Backend API response を domain model に変換できる。
 - 欠損値や不正値を適切に拒否する。
 - API error を application が扱える error に変換する。
 
 `openapi-fetch` 自体の挙動はテストしない。テストするのは、このプロジェクトの adapter と mapper の仕様です。
 
-### Composition
+### DI
 
 対象:
 
@@ -155,11 +155,11 @@ application test では repository を fake / stub にする。
 
 検証すること:
 
-- 原則として、composition 自体に複雑なロジックを置かない。
-- composition の単体テストは必須にしない。
+- 原則として、di 自体に複雑なロジックを置かない。
+- di の単体テストは必須にしない。
 - application / infrastructure の振る舞い自体は、それぞれの layer test で検証する。
 
-ただし、以下の場合は composition test を追加する。
+ただし、以下の場合は di test を追加する。
 
 - feature flag により実装を切り替える。
 - static export / Node.js server で実装を切り替える。
@@ -247,7 +247,7 @@ Large は、仕様が固まり、主要導線が増えてから Playwright 等�
 
 期待仕様:
   ログイン中のユーザーを取得する
-  Laravel API response を User Entity に変換する
+  Backend API response を User Entity に変換する
   User Entity を UserProfileViewModel に変換する
   View は displayName と statusLabel を表示する
   API error の場合は再試行できる error state を表示する
@@ -287,14 +287,14 @@ Feature: ユーザープロフィール表示
 
   Scenario: ログイン中のユーザーが自分のプロフィールを確認できる
     Given ログイン中のユーザーが存在する
-    And Laravel API がユーザー情報を返す
+    And Backend API がユーザー情報を返す
     When ユーザーがプロフィール画面を開く
     Then ユーザー名が表示される
     And アカウント状態が表示される
 
   Scenario: ユーザー情報の取得に失敗した場合
     Given ログイン中のユーザーが存在する
-    And Laravel API がエラーを返す
+    And Backend API がエラーを返す
     When ユーザーがプロフィール画面を開く
     Then エラーメッセージが表示される
     And 再試行できる
@@ -325,23 +325,23 @@ Gherkin を自動化する条件:
 
 ## Test File Placement
 
-テストは対象ファイルの近くに置く。
+テストは `test/` 配下に layer 構造をミラーして置く。対象ファイルとの対応が分かるように、`src/{layer}/...` と `test/{layer}/...` の path を揃える。
 
 ```txt
 src/domain/user/user-name.ts
-src/domain/user/user-name.test.ts
+test/domain/user/user-name.test.ts
 
-src/application/user/get-current-user.ts
-src/application/user/get-current-user.test.ts
+src/application/user/use-case-factory/create-get-current-user-use-case.ts
+test/application/user/use-case-factory/create-get-current-user-use-case.test.ts
 
-src/infrastructure/laravel/mappers/user-mapper.ts
-src/infrastructure/laravel/mappers/user-mapper.test.ts
+src/infrastructure/api/user/mappers/user-mapper.ts
+test/infrastructure/api/user/mappers/user-mapper.test.ts
 
-src/presentation/user/user-profile-presenter.ts
-src/presentation/user/user-profile-presenter.test.ts
+src/presentation/user-profile/user-profile-presenter.ts
+test/presentation/user-profile/user-profile-presenter.test.ts
 
-src/view/user/user-profile-view.tsx
-src/view/user/user-profile-view.test.tsx
+src/view/user-profile/user-profile-view.tsx
+test/view/user-profile/user-profile-view.test.tsx
 ```
 
 Gherkin は feature 単位で置く。

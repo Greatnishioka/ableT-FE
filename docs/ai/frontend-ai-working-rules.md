@@ -15,14 +15,14 @@ AI は以下を守る。
 
 - layer responsibilities に従う。
 - 振る舞いを変える場合は、先にテストを追加または更新する。
-- Laravel API の型は generated OpenAPI types を使う。
-- Laravel API access は `infrastructure` に置く。
+- Backend API の型は generated OpenAPI types を使う。
+- Backend API access は `infrastructure` に置く。
 - API client primitive は `shared/api` に置く。
 - UI state は `presentation` に置く。
 - View は pure rendering に保つ。
 - View は ViewModel を props として受け取る。
 - domain は React / Next.js から独立させる。
-- composition root は `src/composition` または `src/app/_composition` に置く。
+- DI provider は `src/di` に置く。
 - 完了前に必要な check を実行するか、実行できなかった理由を書く。
 
 ## Must Not
@@ -36,13 +36,13 @@ AI は以下をしてはいけない。
 - `view` から `infrastructure` を import しない。
 - `application` から `infrastructure` を import しない。
 - `presentation` から `infrastructure` を import しない。
-- `composition` に business logic を置かない。
-- `composition` に mapping logic を置かない。
-- `composition` から API client を直接呼ばない。
-- `composition` を application use case を迂回する近道として使わない。
+- `di` に business logic を置かない。
+- `di` に mapping logic を置かない。
+- `di` から API client を直接呼ばない。
+- `di` を application use case を迂回する近道として使わない。
 - React component に business rule を置かない。
 - ViewModel logic を domain に置かない。
-- Laravel API response shape を View props に出さない。
+- Backend API response shape を View props に出さない。
 - Zod を generated OpenAPI types の代替として使わない。
 - generated files を手で編集しない。
 - TypeScript strict settings を弱めない。
@@ -65,7 +65,7 @@ Allowed:
 Not allowed:
 
 - direct API call from `presentation` or `view`
-- passing Laravel API response directly to `view`
+- passing Backend API response directly to `view`
 - importing `infrastructure` from `application`
 - importing `domain` entity into View props
 - putting validation or business invariant in JSX
@@ -99,9 +99,10 @@ Not allowed:
 | Command mapper | `{feature}-command-mapper.ts` |
 | Error presenter | `{feature}-error-presenter.ts` |
 | Form draft mapper | `{feature}-form-draft-mapper.ts` |
-| Use case factory | `{action}-{resource}.ts` |
+| Use case factory | `create-{action}-{resource}-use-case.ts` |
+| Use case group factory | `create-{context}-use-cases.ts` |
 | Repository port | `{resource}-repository.ts` |
-| Laravel repository | `{resource}-repository.ts` |
+| API adapter | `{context}-api-adapter.ts` |
 | API mapper | `{resource}-mapper.ts` |
 | Test | same file name + `.test.ts` or `.test.tsx` |
 
@@ -110,13 +111,15 @@ Not allowed:
 ```txt
 src/view/user-profile/user-profile-view.tsx
 src/presentation/user-profile/user-profile-presenter.ts
-src/presentation/user-profile/user-profile-view-model.ts
-src/presentation/user-profile/user-profile-view-model-mapper.ts
-src/composition/user-composition.ts
-src/application/user/get-current-user.ts
-src/application/ports/user-repository.ts
-src/infrastructure/laravel/user-repository.ts
-src/infrastructure/laravel/mappers/user-mapper.ts
+src/presentation/user-profile/view-model/user-profile-view-model.ts
+src/presentation/user-profile/mapper/user-profile-command-mapper.ts
+src/presentation/user-profile/error/user-profile-error-presenter.ts
+src/di/user/user-use-cases.ts
+src/application/user/use-case-factory/create-get-current-user-use-case.ts
+src/application/user/use-case-factory/create-user-use-cases.ts
+src/application/user/ports/user-repository.ts
+src/infrastructure/api/user/user-api-adapter.ts
+src/infrastructure/api/user/mappers/user-mapper.ts
 ```
 
 ## Dependency Rule
@@ -176,7 +179,7 @@ Layer summary:
   application:
   domain:
   infrastructure:
-  composition:
+  di:
   shared:
 
 Tests:
