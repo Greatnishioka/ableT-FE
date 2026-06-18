@@ -3,10 +3,10 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { login } from "@/src/di/auth/auth-use-cases";
-import { toLoginCommand } from "@/src/presentation/login/mapper/login-command-mapper";
 import { presentLoginError } from "@/src/presentation/login/error/login-error-presenter";
+import { toLoginCommand } from "@/src/presentation/login/mapper/login-command-mapper";
 import type { LoginViewModel } from "@/src/presentation/login/view-model/login-view-model";
-import { LoginView } from "@/src/view/login/login-view";
+import type { LoginViewProps } from "@/src/view/login/login-view";
 
 type LoginFormState = {
   email: string;
@@ -22,7 +22,7 @@ const initialState: LoginFormState = {
   errorMessage: null,
 };
 
-export function LoginPresenter() {
+export function useLoginPresenter(): LoginViewProps {
   const router = useRouter();
   const [state, setState] = useState<LoginFormState>(initialState);
 
@@ -60,16 +60,14 @@ export function LoginPresenter() {
     }
   }
 
-  return (
-    <LoginView
-      viewModel={viewModel}
-      onEmailChange={(email) => {
-        setState((current) => ({ ...current, email, errorMessage: null }));
-      }}
-      onPasswordChange={(password) => {
-        setState((current) => ({ ...current, password, errorMessage: null }));
-      }}
-      onSubmit={handleSubmit}
-    />
-  );
+  return {
+    viewModel,
+    onEmailChange(email) {
+      setState((current) => ({ ...current, email, errorMessage: null }));
+    },
+    onPasswordChange(password) {
+      setState((current) => ({ ...current, password, errorMessage: null }));
+    },
+    onSubmit: handleSubmit,
+  };
 }

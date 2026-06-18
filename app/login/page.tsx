@@ -1,5 +1,5 @@
-import { LoginPresenter } from "@/src/presentation/login/login-presenter";
+import { LoginPageClient } from "@/app/login/login-page-client";
 
 export default function LoginPage() {
-  return <LoginPresenter />;
+  return <LoginPageClient />;
 }

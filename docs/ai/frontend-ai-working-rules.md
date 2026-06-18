@@ -21,6 +21,8 @@ AI は以下を守る。
 - UI state は `presentation` に置く。
 - View は pure rendering に保つ。
 - View は ViewModel を props として受け取る。
+- `presentation` は JSX を返さず、presenter hook で View props を返す。
+- Client Component の境界と View との接続は `app` 側の client container に置く。
 - domain は React / Next.js から独立させる。
 - DI provider は `src/di` に置く。
 - 完了前に必要な check を実行するか、実行できなかった理由を書く。
@@ -40,6 +42,7 @@ AI は以下をしてはいけない。
 - `di` に mapping logic を置かない。
 - `di` から API client を直接呼ばない。
 - `di` を application use case を迂回する近道として使わない。
+- `presentation` から JSX を返さない。
 - React component に business rule を置かない。
 - ViewModel logic を domain に置かない。
 - Backend API response shape を View props に出さない。

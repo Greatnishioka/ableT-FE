@@ -259,6 +259,8 @@ export function UserProfileView({
 - View event を application command/query に変換する。
 - application error を画面表示用 message に変換する。
 
+`presentation` は JSX を返さない。presenter は hook として実装し、View への props を返す。Client Component の境界や View との接続は `app` 側の client container に置く。
+
 ```ts
 // src/presentation/user-profile/view-model/user-profile-view-model.ts
 export type UserProfileViewModel = {
@@ -318,7 +320,7 @@ export function useUserProfilePresenter() {
   }, [load]);
 
   return {
-    ...state,
+    viewModel: state,
     onReload: load,
   };
 }
@@ -334,6 +336,20 @@ function toViewModel(user: User): UserProfileViewModel {
 ```
 
 `presentation` は domain を読んで ViewModel に翻訳してよい。ただし、domain rule 自体を presentation に移さない。
+
+```tsx
+// app/user-profile/user-profile-page-client.tsx
+"use client";
+
+import { useUserProfilePresenter } from "@/src/presentation/user-profile/user-profile-presenter";
+import { UserProfileView } from "@/src/view/user-profile/user-profile-view";
+
+export function UserProfilePageClient() {
+  const userProfileViewProps = useUserProfilePresenter();
+
+  return <UserProfileView {...userProfileViewProps} />;
+}
+```
 
 ### Presenter Split Criteria
 

@@ -1,7 +1,7 @@
 import type { FormEvent } from "react";
 import type { LoginViewModel } from "@/src/presentation/login/view-model/login-view-model";
 
-type LoginViewProps = {
+export type LoginViewProps = {
   viewModel: LoginViewModel;
   onEmailChange(email: string): void;
   onPasswordChange(password: string): void;
