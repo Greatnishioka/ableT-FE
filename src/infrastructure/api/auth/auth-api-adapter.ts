@@ -1,4 +1,4 @@
-import type { AuthRepository } from "@/src/application/ports/auth/auth-repository";
+import type { AuthRepository } from "@/src/application/auth/ports/auth-repository";
 import { AuthenticationFailedError } from "@/src/application/auth/error/auth-errors";
 import { mapAuthError } from "@/src/infrastructure/api/auth/mappers/auth-error-mapper";
 
