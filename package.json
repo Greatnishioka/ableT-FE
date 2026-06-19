@@ -6,12 +6,20 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "api:generate": "openapi-typescript ../ableTo/storage/api-docs/api-docs.json -o src/shared/api/schema.d.ts",
+    "api:check": "npm run api:generate && git diff --exit-code -- src/shared/api/schema.d.ts",
+    "ci": "npm run api:check && npm run typecheck && npm run lint && npm run test && npm run build"
   },
   "dependencies": {
     "next": "16.2.6",
+    "openapi-fetch": "^0.17.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -20,7 +28,12 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "eslint-plugin-boundaries": "^6.0.2",
+    "lefthook": "^2.1.9",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "typescript-eslint": "^8.61.1",
+    "vitest": "^3.2.6"
   }
 }

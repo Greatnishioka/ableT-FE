@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# able-T-FE
 
-## Getting Started
+Able-T の Next.js フロントエンドです。
 
-First, run the development server:
+## 技術スタック
+
+- Next.js
+- TypeScript
+- openapi-typescript
+- openapi-fetch
+- Zod
+- Tailwind CSS
+- Vitest
+- ESLint / typescript-eslint
+- eslint-plugin-boundaries
+- lefthook
+
+## 設計方針
+
+- OpenAPI schema を API 契約の source of truth にする。
+- API client は `infrastructure` / `shared/api` に閉じ込める。
+- `fetch` の直呼びは禁止する。
+- View は domain model を直接受け取らない。
+- View は ViewModel を props として受け取る。
+- Backend API response は View に直接流さない。
+- フロントエンド domain はバックエンド domain の複製にしない。
+- 機械的に判断できるアーキテクチャ違反は ESLint / custom rule で検出する。
+
+## ドキュメント
+
+最初に読むもの:
+
+- [Frontend AI Working Rules](docs/ai/frontend-ai-working-rules.md)
+- [Frontend Quality Stack](docs/plan/lib/frontend-quality-stack-final.md)
+- [Frontend DDD / MVVM Architecture](docs/plan/architecture/frontend-ddd-mvvm-architecture.md)
+- [Frontend Test Strategy](docs/plan/testing/frontend-test-strategy.md)
+
+AI に実装を依頼する場合は、まず Frontend AI Working Rules を読ませてから、関連する設計ドキュメントを参照してください。
+
+草案:
+
+- [Deprecated Frontend Quality Stack Draft](docs/plan/lib/frontend-quality-stack.md)
+
+## 開発コマンド
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run build
+npm run lint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+導入予定:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run api:generate
+npm run api:check
+npm run typecheck
+npm run test
+npm run ci
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Dependency 管理
 
-## Learn More
+本番 runtime で必要なものは `dependencies`、型生成・lint・test・build 補助だけで使うものは `devDependencies` に置く。
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm ci --omit=dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+ただし Next.js を本番環境で直接 build する場合は、TypeScript や Tailwind などの devDependencies も必要になる。推奨は CI/build stage で build し、runtime stage には成果物を配信する構成です。
