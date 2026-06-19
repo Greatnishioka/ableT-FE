@@ -79,10 +79,6 @@ export function LoginView({
           >
             {viewModel.isSubmitting ? "ログイン中..." : "ログイン"}
           </button>
-
-          <p className="mt-4 text-xs leading-5 text-slate-500">
-            デモ: demo@example.com / password123
-          </p>
         </form>
       </section>
     </main>
